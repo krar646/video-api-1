@@ -18,13 +18,18 @@ def extract():
 
     url = data["url"]
 
-    # ✅ إعدادات yt-dlp الصحيحة لجلب فيديو مع صوت
+    # ✅ الإعدادات السحرية اللي تشتغل مع كل المواقع
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
+        # ✅ هذا السطر هو الحل: يخلي yt-dlp يجيب فيديو وصوت ويدمجهم
         "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "merge_output_format": "mp4",
+        "postprocessors": [{
+            "key": "FFmpegVideoRemuxer",
+            "preferredcodec": "libx264",
+        }],
     }
 
     try:
@@ -35,10 +40,8 @@ def extract():
             seen_qualities = set()
 
             for f in info.get("formats", []):
-                has_video = f.get("vcodec") and f.get("vcodec") != "none"
-                has_audio = f.get("acodec") and f.get("acodec") != "none"
-                
-                if has_video and has_audio:
+                # ✅ نختار التنسيقات اللي فيها فيديو
+                if f.get("vcodec") and f.get("vcodec") != "none":
                     height = f.get("height", 0)
                     if height and height not in seen_qualities:
                         seen_qualities.add(height)
@@ -54,15 +57,15 @@ def extract():
                         else:
                             quality = f"{height}p"
                         
+                        # ✅ نضيف رابط التحميل (yt-dlp سيهتم بدمج الصوت)
                         formats.append({
                             "quality": quality,
                             "height": height,
-                            "ext": f.get("ext", "mp4"),
+                            "ext": "mp4",
                             "filesize": f.get("filesize") or f.get("filesize_approx") or 0,
                             "url": f.get("url"),
                             "format_id": f.get("format_id"),
                             "vcodec": f.get("vcodec"),
-                            "acodec": f.get("acodec")
                         })
 
             formats.sort(key=lambda x: x["height"], reverse=True)
