@@ -18,13 +18,13 @@ def extract():
 
     url = data["url"]
 
-    # ✅ إعدادات yt-dlp لجلب جميع الجودات المتاحة
+    # ✅ إعدادات yt-dlp الصحيحة لجلب فيديو مع صوت
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
-        # ✅ جلب كل الجودات
-        "format": "all",
+        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "merge_output_format": "mp4",
     }
 
     try:
@@ -35,15 +35,14 @@ def extract():
             seen_qualities = set()
 
             for f in info.get("formats", []):
-                # ✅ نتأكد إنه فيديو (vcodec موجود) وليس صوت فقط
-                if f.get("vcodec") and f.get("vcodec") != "none":
+                has_video = f.get("vcodec") and f.get("vcodec") != "none"
+                has_audio = f.get("acodec") and f.get("acodec") != "none"
+                
+                if has_video and has_audio:
                     height = f.get("height", 0)
-
-                    # ✅ نتأكد إن الدقة موجودة
                     if height and height not in seen_qualities:
                         seen_qualities.add(height)
-
-                        # ✅ نحدد اسم الجودة
+                        
                         if height >= 1080:
                             quality = "1080p"
                         elif height >= 720:
@@ -52,44 +51,26 @@ def extract():
                             quality = "480p"
                         elif height >= 360:
                             quality = "360p"
-                        elif height >= 240:
-                            quality = "240p"
                         else:
                             quality = f"{height}p"
-
-                        # ✅ تحديد نوع الملف
-                        ext = f.get("ext", "mp4")
-                        if ext not in ["mp4", "webm", "mkv"]:
-                            ext = "mp4"
-
+                        
                         formats.append({
                             "quality": quality,
                             "height": height,
-                            "ext": ext,
+                            "ext": f.get("ext", "mp4"),
                             "filesize": f.get("filesize") or f.get("filesize_approx") or 0,
                             "url": f.get("url"),
                             "format_id": f.get("format_id"),
-                            "vcodec": f.get("vcodec")
+                            "vcodec": f.get("vcodec"),
+                            "acodec": f.get("acodec")
                         })
 
-            # ✅ نرتب الجودات من الأعلى إلى الأقل
             formats.sort(key=lambda x: x["height"], reverse=True)
-
-            # ✅ البحث عن أفضل رابط MP4
-            best_video = None
-            for f in formats:
-                if f["ext"] == "mp4" and f["height"] >= 360:
-                    best_video = f["url"]
-                    break
-
-            if best_video is None and formats:
-                best_video = formats[0]["url"]
 
             return jsonify({
                 "title": info.get("title"),
                 "thumbnail": info.get("thumbnail"),
                 "duration": info.get("duration"),
-                "best_url": best_video,
                 "formats": formats,
                 "status": "success"
             })
