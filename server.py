@@ -18,12 +18,11 @@ def extract():
 
     url = data["url"]
 
-    # ✅ الإعدادات السحرية اللي تشتغل مع كل المواقع
+    # ✅ إعدادات yt-dlp لدمج الفيديو مع الصوت
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
-        # ✅ هذا السطر هو الحل: يخلي yt-dlp يجيب فيديو وصوت ويدمجهم
         "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "merge_output_format": "mp4",
         "postprocessors": [{
@@ -40,7 +39,6 @@ def extract():
             seen_qualities = set()
 
             for f in info.get("formats", []):
-                # ✅ نختار التنسيقات اللي فيها فيديو
                 if f.get("vcodec") and f.get("vcodec") != "none":
                     height = f.get("height", 0)
                     if height and height not in seen_qualities:
@@ -57,7 +55,6 @@ def extract():
                         else:
                             quality = f"{height}p"
                         
-                        # ✅ نضيف رابط التحميل (yt-dlp سيهتم بدمج الصوت)
                         formats.append({
                             "quality": quality,
                             "height": height,
