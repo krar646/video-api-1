@@ -14,66 +14,69 @@ def extract():
     data = request.get_json(silent=True)
 
     if not data or "url" not in data:
+        return jsonify({"status": "error", "error": "No URL provided"}), 400
+
+    url = data["url"]
+
+    # ✅ منع يوتيوب
+    if 'youtube.com' in url or 'youtu.be' in url:
         return jsonify({
             "status": "error",
-            "error": "No URL provided"
-        }), 400
+            "error": "YouTube downloads are not supported"
+        }), 403
 
     try:
         ydl_opts = {
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
+            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+            "merge_output_format": "mp4",
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(data["url"], download=False)
+            info = ydl.extract_info(url, download=False)
 
             formats = []
+            seen_qualities = set()
 
             for f in info.get("formats", []):
+                if f.get("vcodec") and f.get("vcodec") != "none":
+                    height = f.get("height", 0)
+                    if height and height not in seen_qualities:
+                        seen_qualities.add(height)
+                        
+                        if height >= 1080:
+                            quality = "1080p"
+                        elif height >= 720:
+                            quality = "720p"
+                        elif height >= 480:
+                            quality = "480p"
+                        elif height >= 360:
+                            quality = "360p"
+                        else:
+                            quality = f"{height}p"
+                        
+                        formats.append({
+                            "quality": quality,
+                            "height": height,
+                            "ext": "mp4",
+                            "url": f.get("url"),
+                            "filesize": f.get("filesize") or 0,
+                        })
 
-                # ✅ فيديو + صوت فقط (فيديو كامل)
-                if (
-                    f.get("url")
-                    and f.get("vcodec") != "none"
-                    and f.get("acodec") != "none"
-                ):
-
-                    formats.append({
-                        "quality": f"{f.get('height', 0)}p",
-                        "height": f.get("height", 0),
-                        "ext": f.get("ext", "mp4"),
-                        "url": f.get("url"),
-                        "filesize": (
-                            f.get("filesize")
-                            or f.get("filesize_approx")
-                            or 0
-                        )
-                    })
-
-            formats.sort(
-                key=lambda x: x["height"],
-                reverse=True
-            )
-
-            best_url = formats[0]["url"] if formats else ""
+            formats.sort(key=lambda x: x["height"], reverse=True)
 
             return jsonify({
                 "status": "success",
                 "title": info.get("title", ""),
                 "thumbnail": info.get("thumbnail", ""),
                 "duration": info.get("duration", 0),
-                "best_url": best_url,
-                "formats": formats
+                "formats": formats,
             })
 
     except Exception as e:
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
-
+        return jsonify({"status": "error", "error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
