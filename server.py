@@ -26,14 +26,45 @@ def extract():
         }), 403
 
     try:
+        # ✅ الخطوة 1: نجيب كل التنسيقات عشان نشوف الوضع
         ydl_opts = {
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
-            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-            "merge_output_format": "mp4",
+            "format": "all",
         }
 
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+
+            # ✅ نشوف إذا فيه فيديو كامل (صوت مدمج)
+            has_complete_format = False
+            for f in info.get("formats", []):
+                if (f.get("vcodec") and f.get("vcodec") != "none" and
+                    f.get("acodec") and f.get("acodec") != "none"):
+                    has_complete_format = True
+                    break
+
+        # ✅ الخطوة 2: نختار الإعدادات المناسبة
+        if has_complete_format:
+            # ✅ فيه فيديو كامل (صوت مدمج) → نجيبه مباشرة
+            ydl_opts = {
+                "quiet": True,
+                "no_warnings": True,
+                "noplaylist": True,
+                "format": "best[ext=mp4]/best",
+            }
+        else:
+            # ✅ مافيه فيديو كامل → ندمج الفيديو مع الصوت
+            ydl_opts = {
+                "quiet": True,
+                "no_warnings": True,
+                "noplaylist": True,
+                "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+                "merge_output_format": "mp4",
+            }
+
+        # ✅ الخطوة 3: نستخرج المعلومات ونبني الـ formats
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
 
@@ -73,6 +104,7 @@ def extract():
                 "thumbnail": info.get("thumbnail", ""),
                 "duration": info.get("duration", 0),
                 "formats": formats,
+                "merged": not has_complete_format,  # ✅ نقول للتطبيق إذا كان تم الدمج
             })
 
     except Exception as e:
